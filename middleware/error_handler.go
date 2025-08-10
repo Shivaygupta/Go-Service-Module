@@ -10,9 +10,10 @@ import (
 )
 
 type APIResponse struct {
-	Data    any    `json:"data,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Message string `json:"message,omitempty"`
+	Data       any    `json:"data,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Message    string `json:"message,omitempty"`
+	StatusCode int    `json:"status_code"`
 }
 
 func ErrorHandler() gin.HandlerFunc {
@@ -25,14 +26,16 @@ func ErrorHandler() gin.HandlerFunc {
 
 			if e, ok := err.(*errors.AppError); ok {
 				c.JSON(e.StatusCode, APIResponse{
-					Error:   e.Message,
-					Message: e.Debug,
+					Error:      e.Error(),
+					Message:    e.Debug,
+					StatusCode: e.StatusCode,
 				})
 			} else {
 
 				c.JSON(http.StatusInternalServerError, APIResponse{
-					Error:   errors.ErrInternal.Message,
-					Message: err.Error(),
+					Error:      err.Error(),
+					Message:    errors.ErrInternal.Message,
+					StatusCode: http.StatusInternalServerError,
 				})
 			}
 		}

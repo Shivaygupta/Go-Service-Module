@@ -287,3 +287,5 @@ Error Response:
 - Centralized error handling middleware ensures consistent API responses
 
 - Errors are wrapped with context to help with debugging
+
+
