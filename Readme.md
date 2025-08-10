@@ -288,4 +288,66 @@ Error Response:
 
 - Errors are wrapped with context to help with debugging
 
+### Testing Plan
+
+#### Testing Objective
+
+- Validate correctness of business logic.
+
+- Ensure database interactions work as expected.
+
+- Verify HTTP handlers respond properly.
+
+- Confirm error handling and edge cases.
+
+- Enable safe refactoring by providing regression tests.
+
+#### Test Cases 
+
+##### Fetch Service by ID
+- Fetch Service by Valid ID
+
+    - Input: Existing service ID
+    - Expect: Return service data with all associated versions, HTTP 200 OK
+
+- Fetch Service by Non-Existent ID
+
+    - Input: ID that does not exist in DB
+    - Expect: Return HTTP 404 Not Found with appropriate error message
+
+- Fetch Service by Invalid ID (e.g., negative or zero)
+
+    - Input: Invalid ID format or values
+    - Expect: Return HTTP 400 Bad Request with validation error
+
+- Fetch Service by ID with DB Error (e.g., connection lost)
+    
+    - Simulate DB failure during fetch
+    - Expect: Return HTTP 500 Internal Server Error with generic error message
+
+
+##### List Services with Filters and Pagination
+- List Services Without Filters
+
+    - Input: Empty filter parameters
+    - Expect: Return first page with default limit, sorted by default field and order
+
+- List Services with Valid Filters (name, sort, order, page, limit)
+
+    - Input: Valid filter values
+    - Expect: Return filtered, sorted, and paginated list of services
+
+- List Services with Invalid Filter Values
+
+    - Input: Invalid sort field, order, page, or limit (e.g., negative page)
+    - Expect: Defaults applied; no errors, valid response
+
+-   List Services When No Services Exist
+
+    - Input: Empty DB
+    - Expect: Return empty data array, HTTP 200 OK
+
+-   List Services with Partial DB Failure (e.g., during count or fetch)
+    - Simulate DB query failure
+    - Expect: Return HTTP 500 Internal Server Error
 
