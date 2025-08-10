@@ -25,11 +25,13 @@ func (h *ServiceHandler) GetServices(c *gin.Context) {
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil || limit <= 0 {
 		c.Error(apperr.ErrInvalidInput)
+		c.Error(apperr.ErrInvalidInput)
 		return
 	}
 
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
+		c.Error(apperr.ErrInvalidInput)
 		c.Error(apperr.ErrInvalidInput)
 		return
 	}
@@ -56,7 +58,6 @@ func (h *ServiceHandler) GetServices(c *gin.Context) {
 func (h *ServiceHandler) GetServiceByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 
-	log.Printf("id in handler: ", id)
 	if err != nil || id <= 0 {
 		c.Error(apperr.ErrInvalidID)
 		return
