@@ -1,10 +1,9 @@
 package middleware
 
 import (
+	"kong-go-assignment/errors"
 	"log"
 	"net/http"
-
-	"kong-go-assignment/errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,23 +20,22 @@ func ErrorHandler() gin.HandlerFunc {
 		c.Next()
 
 		if len(c.Errors) > 0 {
-			err := c.Errors[0].Err
-			log.Printf("Error: %v", err)
-
-			if e, ok := err.(*errors.AppError); ok {
-				c.JSON(e.StatusCode, APIResponse{
-					Error:      e.Error(),
-					Message:    e.Debug,
-					StatusCode: e.StatusCode,
-				})
-			} else {
-
-				c.JSON(http.StatusInternalServerError, APIResponse{
-					Error:      err.Error(),
-					Message:    errors.ErrInternal.Message,
-					StatusCode: http.StatusInternalServerError,
-				})
+			for _, err := range c.Errors {
+				log.Printf("Error: %v", err)
+				if e, ok := err.Err.(*errors.AppError); ok {
+					c.JSON(e.StatusCode, APIResponse{
+						Error:      e.Error(),
+						Message:    e.Debug,
+						StatusCode: e.StatusCode,
+					})
+					return
+				}
 			}
 		}
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Error:      errors.ErrInternal.Message,
+			Message:    errors.ErrInternal.Debug,
+			StatusCode: errors.ErrInternal.StatusCode,
+		})
 	}
 }
