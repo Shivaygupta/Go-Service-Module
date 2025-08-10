@@ -100,7 +100,6 @@ func (h *ServiceHandler) DeleteServiceByID(c *gin.Context) {
 		if errors.Is(err, apperr.ErrNotFound) {
 			c.Error(apperr.ErrNotFound)
 		} else {
-			// Other errors
 			c.Error(err)
 		}
 		return
