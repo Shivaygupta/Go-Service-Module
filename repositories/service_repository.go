@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"gorm.io/gorm"
@@ -16,7 +17,8 @@ var ErrNotFound = errors.New("not found")
 type ServiceRepository interface {
 	FindAll(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error)
 	FindByID(ctx context.Context, id uint) (*models.Service, error)
-	Create(ctx context.Context, svc *models.Service) error
+	CreateService(ctx context.Context, svc *models.Service) error
+	DeleteServiceByID(ctx context.Context, id uint) error
 }
 
 type serviceRepo struct {
@@ -38,8 +40,6 @@ func calculateOffset(page, limit int) int {
 func (r *serviceRepo) FindAll(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error) {
 	var out []models.Service
 	dbq := r.db.WithContext(ctx).Model(&models.Service{}).Preload("Versions")
-
-	filter.Normalize()
 
 	if filter.Name != "" {
 		like := "%" + strings.ToLower(filter.Name) + "%"
@@ -79,16 +79,64 @@ func (r *serviceRepo) FindAll(ctx context.Context, filter models.ServiceListFilt
 }
 
 func (r *serviceRepo) FindByID(ctx context.Context, id uint) (*models.Service, error) {
+
+	log.Printf("id: ", id)
 	var svc models.Service
 	if err := r.db.WithContext(ctx).Preload("Versions").First(&svc, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
+			return nil, apperr.New(
+				apperr.ErrInternal.StatusCode,
+				apperr.ErrInternal.Message,
+				"serviceRepo.FindById query error: "+err.Error())
 		}
 		return nil, err
 	}
 	return &svc, nil
 }
 
-func (r *serviceRepo) Create(ctx context.Context, svc *models.Service) error {
-	return r.db.WithContext(ctx).Create(svc).Error
+func (r *serviceRepo) CreateService(ctx context.Context, svc *models.Service) error {
+	var existing models.Service
+	err := r.db.WithContext(ctx).Where("LOWER(name) = LOWER(?)", svc.Name).First(&existing).Error
+	if err == nil {
+		return apperr.New(
+			apperr.ErrConflict.StatusCode,
+			"Service with the same name already exists",
+			"duplicate service name: "+svc.Name,
+		)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperr.New(
+			apperr.ErrInternal.StatusCode,
+			apperr.ErrInternal.Message,
+			"serviceRepo.Create duplicate check error: "+err.Error(),
+		)
+	}
+
+	if len(svc.Versions) > 0 {
+		for i := range svc.Versions {
+			svc.Versions[i].ID = uint(i + 1) // start from 1
+		}
+	}
+
+	if err := r.db.WithContext(ctx).Create(svc).Error; err != nil {
+		return apperr.New(
+			apperr.ErrInternal.StatusCode,
+			apperr.ErrInternal.Message,
+			"serviceRepo.Create insert error: "+err.Error(),
+		)
+	}
+
+	return nil
+}
+
+func (r *serviceRepo) DeleteServiceByID(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Delete(&models.Service{}).Error; err != nil {
+			return apperr.New(
+				apperr.ErrInternal.StatusCode,
+				apperr.ErrInternal.Message,
+				"serviceRepo.DeleteServiceByID delete error: "+err.Error(),
+			)
+		}
+		return nil
+	})
 }

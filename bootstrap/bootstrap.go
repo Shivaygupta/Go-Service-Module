@@ -23,33 +23,31 @@ type App struct {
 }
 
 func InitializeApp() (*App, error) {
-
-	cfg := config.Load()
-
-	db, err := connectDatabase(&cfg)
+	cfg := initConfig()
+	db, err := initDatabase(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to DB: %w", err)
+		return nil, err
 	}
 
-	if err := db.AutoMigrate(&models.Service{}, &models.ServiceVersion{}); err != nil {
-		return nil, fmt.Errorf("failed to migrate DB: %w", err)
+	if err := runMigrations(db); err != nil {
+		return nil, err
 	}
 
-	serviceRepo := repositories.NewServiceRepository(db)
-
-	serviceSvc := services.NewServiceService(serviceRepo)
-
-	serviceHandler := handlers.NewServiceHandler(serviceSvc)
-	router := handlers.NewRouter(serviceHandler)
+	router := initRouter(initServices(db))
 
 	return &App{
-		Config: &cfg,
+		Config: cfg,
 		DB:     db,
 		Router: router,
 	}, nil
 }
 
-func connectDatabase(cfg *config.Config) (*gorm.DB, error) {
+func initConfig() *config.Config {
+	cfg := config.Load()
+	return &cfg
+}
+
+func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName,
@@ -57,7 +55,7 @@ func connectDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to DB: %w", err)
 	}
 
 	sqlDB, err := db.DB()
@@ -70,4 +68,18 @@ func connectDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 	log.Println("Database connection established")
 	return db, nil
+}
+
+func runMigrations(db *gorm.DB) error {
+	return db.AutoMigrate(&models.Service{}, &models.ServiceVersion{})
+}
+
+func initServices(db *gorm.DB) *handlers.ServiceHandler {
+	serviceRepo := repositories.NewServiceRepository(db)
+	serviceSvc := services.NewServiceService(serviceRepo)
+	return handlers.NewServiceHandler(serviceSvc)
+}
+
+func initRouter(serviceHandler *handlers.ServiceHandler) *gin.Engine {
+	return handlers.NewRouter(serviceHandler)
 }

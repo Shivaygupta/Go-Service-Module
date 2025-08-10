@@ -12,6 +12,7 @@ type ServiceService interface {
 	ListServices(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error)
 	GetService(ctx context.Context, id uint) (*models.Service, error)
 	CreateService(ctx context.Context, svc *models.Service) error
+	DeleteService(ctx context.Context, id uint) error
 }
 
 type serviceService struct {
@@ -23,6 +24,7 @@ func NewServiceService(repo repositories.ServiceRepository) ServiceService {
 }
 
 func (s *serviceService) ListServices(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error) {
+	filter.Normalize()
 	return s.repo.FindAll(ctx, filter)
 }
 
@@ -34,5 +36,10 @@ func (s *serviceService) CreateService(ctx context.Context, svc *models.Service)
 	if svc.Name == "" {
 		return errors.New(errors.ErrInvalidInput.StatusCode, "service name is required", "empty service name in CreateService")
 	}
-	return s.repo.Create(ctx, svc)
+	return s.repo.CreateService(ctx, svc)
+}
+
+func (s *serviceService) DeleteService(ctx context.Context, id uint) error {
+
+	return s.repo.DeleteServiceByID(ctx, id)
 }
