@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -79,15 +80,13 @@ func (r *serviceRepo) FindAll(ctx context.Context, filter models.ServiceListFilt
 }
 
 func (r *serviceRepo) FindByID(ctx context.Context, id uint) (*models.Service, error) {
-
-	log.Printf("id: ", id)
 	var svc models.Service
 	if err := r.db.WithContext(ctx).Preload("Versions").First(&svc, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperr.New(
 				apperr.ErrInternal.StatusCode,
 				apperr.ErrInternal.Message,
-				"serviceRepo.FindById query error: "+err.Error())
+				fmt.Sprintf("Service with id: %d not found", id))
 		}
 		return nil, err
 	}
@@ -113,7 +112,7 @@ func (r *serviceRepo) CreateService(ctx context.Context, svc *models.Service) er
 
 	if len(svc.Versions) > 0 {
 		for i := range svc.Versions {
-			svc.Versions[i].ID = uint(i + 1) // start from 1
+			svc.Versions[i].ID = svc.ID
 		}
 	}
 
@@ -130,13 +129,20 @@ func (r *serviceRepo) CreateService(ctx context.Context, svc *models.Service) er
 
 func (r *serviceRepo) DeleteServiceByID(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Delete(&models.Service{}).Error; err != nil {
+		result := tx.Where("id = ?", id).Delete(&models.Service{})
+
+		if result.Error != nil {
 			return apperr.New(
 				apperr.ErrInternal.StatusCode,
 				apperr.ErrInternal.Message,
-				"serviceRepo.DeleteServiceByID delete error: "+err.Error(),
+				"serviceRepo.DeleteServiceByID delete error: "+result.Error.Error(),
 			)
 		}
+
+		if result.RowsAffected == 0 {
+			return apperr.ErrServiceNotFound
+		}
+		log.Printf("Service with ID %d deleted successfully", id)
 		return nil
 	})
 }

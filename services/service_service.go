@@ -24,12 +24,24 @@ func NewServiceService(repo repositories.ServiceRepository) ServiceService {
 }
 
 func (s *serviceService) ListServices(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error) {
-	filter.Normalize()
-	return s.repo.FindAll(ctx, filter)
+	if err := filter.ValidateAndNormalize(); err != nil {
+		return models.PaginatedServices{}, err
+	}
+	services, err := s.repo.FindAll(ctx, filter)
+	if err != nil {
+		return models.PaginatedServices{}, err
+	}
+	return services, nil
 }
 
 func (s *serviceService) GetService(ctx context.Context, id uint) (*models.Service, error) {
-	return s.repo.FindByID(ctx, id)
+
+	services, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return &models.Service{}, err
+	}
+
+	return services, nil
 }
 
 func (s *serviceService) CreateService(ctx context.Context, svc *models.Service) error {

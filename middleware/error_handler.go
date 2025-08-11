@@ -23,19 +23,21 @@ func ErrorHandler() gin.HandlerFunc {
 			for _, err := range c.Errors {
 				log.Printf("Error: %v", err)
 				if e, ok := err.Err.(*errors.AppError); ok {
+					log.Print("inside if block")
 					c.JSON(e.StatusCode, APIResponse{
 						Error:      e.Error(),
 						Message:    e.Debug,
 						StatusCode: e.StatusCode,
 					})
-					return
+				} else {
+					c.JSON(http.StatusInternalServerError, APIResponse{
+						Error:      errors.ErrInternal.Message,
+						Message:    errors.ErrInternal.Debug,
+						StatusCode: errors.ErrInternal.StatusCode,
+					})
 				}
 			}
+
 		}
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Error:      errors.ErrInternal.Message,
-			Message:    errors.ErrInternal.Debug,
-			StatusCode: errors.ErrInternal.StatusCode,
-		})
 	}
 }

@@ -25,13 +25,11 @@ func (h *ServiceHandler) GetServices(c *gin.Context) {
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil || limit <= 0 {
 		c.Error(apperr.ErrInvalidInput)
-		c.Error(apperr.ErrInvalidInput)
 		return
 	}
 
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		c.Error(apperr.ErrInvalidInput)
 		c.Error(apperr.ErrInvalidInput)
 		return
 	}
@@ -44,15 +42,20 @@ func (h *ServiceHandler) GetServices(c *gin.Context) {
 		Limit:  limit,
 	}
 
-	filter.Normalize()
-
-	data, err := h.svc.ListServices(c.Request.Context(), filter)
+	result, err := h.svc.ListServices(c.Request.Context(), filter)
 	if err != nil {
-		c.Error(err)
-		return
+		if appErr, ok := err.(*apperr.AppError); ok {
+			c.JSON(appErr.StatusCode, appErr)
+			return
+		} else {
+			appErr := apperr.New(http.StatusInternalServerError, "Unexpected system error", err.Error())
+			c.JSON(appErr.StatusCode, appErr)
+			return
+		}
+
 	}
 
-	c.JSON(200, gin.H{"data": data})
+	c.JSON(200, gin.H{"data": result})
 }
 
 func (h *ServiceHandler) GetServiceByID(c *gin.Context) {
@@ -65,10 +68,14 @@ func (h *ServiceHandler) GetServiceByID(c *gin.Context) {
 
 	data, err := h.svc.GetService(c.Request.Context(), uint(id))
 	if err != nil {
-		c.Error(apperr.ErrNotFound)
+		if appErr, ok := err.(*apperr.AppError); ok {
+			c.JSON(appErr.StatusCode, appErr)
+		} else {
+			appErr := apperr.New(http.StatusInternalServerError, "invalid value", err.Error())
+			c.JSON(appErr.StatusCode, appErr)
+		}
 		return
 	}
-
 	c.JSON(200, gin.H{"data": data})
 }
 
@@ -100,6 +107,8 @@ func (h *ServiceHandler) DeleteServiceByID(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, apperr.ErrNotFound) {
 			c.Error(apperr.ErrNotFound)
+		} else if errors.Is(err, apperr.ErrServiceNotFound) {
+			c.Error(apperr.ErrServiceNotFound)
 		} else {
 			c.Error(err)
 		}

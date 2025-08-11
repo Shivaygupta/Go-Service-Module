@@ -18,6 +18,7 @@ func NewRouter(h *ServiceHandler) *gin.Engine {
 		v1.GET("/services", h.GetServices)
 		v1.GET("/services/:id", h.GetServiceByID)
 		v1.POST("/services", h.CreateService)
+		v1.DELETE("/services/:id", h.DeleteServiceByID)
 	}
 
 	return r
