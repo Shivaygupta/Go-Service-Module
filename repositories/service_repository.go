@@ -39,7 +39,23 @@ func calculateOffset(page, limit int) int {
 }
 
 func (r *serviceRepo) FindAll(ctx context.Context, filter models.ServiceListFilter) (models.PaginatedServices, error) {
-	var out []models.Service
+	dbq := r.buildBaseQuery(ctx, filter)
+
+	total, err := r.countServices(dbq)
+	if err != nil {
+		return models.PaginatedServices{}, err
+	}
+
+	services, err := r.fetchPaginatedServices(dbq, filter)
+	if err != nil {
+		return models.PaginatedServices{}, err
+	}
+
+	return r.buildPaginatedResponse(services, total, filter), nil
+}
+
+// buildBaseQuery prepares the base GORM query with filters applied
+func (r *serviceRepo) buildBaseQuery(ctx context.Context, filter models.ServiceListFilter) *gorm.DB {
 	dbq := r.db.WithContext(ctx).Model(&models.Service{}).Preload("Versions")
 
 	if filter.Name != "" {
@@ -47,36 +63,49 @@ func (r *serviceRepo) FindAll(ctx context.Context, filter models.ServiceListFilt
 		dbq = dbq.Where("LOWER(name) LIKE ? OR LOWER(description) LIKE ?", like, like)
 	}
 
+	return dbq
+}
+
+// countServices executes COUNT(*) on the given query
+func (r *serviceRepo) countServices(dbq *gorm.DB) (int64, error) {
 	var total int64
 	if err := dbq.Count(&total).Error; err != nil {
-		return models.PaginatedServices{}, apperr.New(
+		return 0, apperr.New(
 			apperr.ErrInternal.StatusCode,
 			apperr.ErrInternal.Message,
 			"serviceRepo.FindAll count error: "+err.Error(),
 		)
 	}
+	return total, nil
+}
 
-	dbq = dbq.Order(buildOrderClause(filter.SortBy, filter.Order)).
+// fetchPaginatedServices fetches records with sorting and pagination applied
+func (r *serviceRepo) fetchPaginatedServices(dbq *gorm.DB, filter models.ServiceListFilter) ([]models.Service, error) {
+	var out []models.Service
+	err := dbq.Order(buildOrderClause(filter.SortBy, filter.Order)).
 		Limit(filter.Limit).
-		Offset(calculateOffset(filter.Page, filter.Limit))
-
-	if err := dbq.Find(&out).Error; err != nil {
-		return models.PaginatedServices{}, apperr.New(
+		Offset(calculateOffset(filter.Page, filter.Limit)).
+		Find(&out).Error
+	if err != nil {
+		return nil, apperr.New(
 			apperr.ErrInternal.StatusCode,
 			apperr.ErrInternal.Message,
 			"serviceRepo.FindAll query error: "+err.Error(),
 		)
 	}
+	return out, nil
+}
 
+// buildPaginatedResponse constructs the PaginatedServices object
+func (r *serviceRepo) buildPaginatedResponse(data []models.Service, total int64, filter models.ServiceListFilter) models.PaginatedServices {
 	totalPages := int((total + int64(filter.Limit) - 1) / int64(filter.Limit))
-
 	return models.PaginatedServices{
-		Data:       out,
+		Data:       data,
 		TotalCount: total,
 		Page:       filter.Page,
 		Limit:      filter.Limit,
 		TotalPages: totalPages,
-	}, nil
+	}
 }
 
 func (r *serviceRepo) FindByID(ctx context.Context, id uint) (*models.Service, error) {
