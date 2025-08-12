@@ -29,7 +29,32 @@ type ServiceListFilter struct {
 }
 
 func (f *ServiceListFilter) ValidateAndNormalize() error {
+	f.trimName()
+
+	if err := f.validateAndSetSortBy(); err != nil {
+		return err
+	}
+
+	if err := f.validateAndSetOrder(); err != nil {
+		return err
+	}
+
+	if err := f.validateAndSetPage(); err != nil {
+		return err
+	}
+
+	if err := f.validateAndSetLimit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (f *ServiceListFilter) trimName() {
 	f.Name = strings.TrimSpace(f.Name)
+}
+
+func (f *ServiceListFilter) validateAndSetSortBy() error {
 	if f.SortBy != "" && !AllowedSortFields[f.SortBy] {
 		return apperr.New(
 			apperr.ErrInvalidInput.StatusCode,
@@ -40,7 +65,10 @@ func (f *ServiceListFilter) ValidateAndNormalize() error {
 	if f.SortBy == "" {
 		f.SortBy = DefaultSort
 	}
+	return nil
+}
 
+func (f *ServiceListFilter) validateAndSetOrder() error {
 	order := strings.ToLower(f.Order)
 	if order != "" && order != "asc" && order != "desc" {
 		return apperr.New(
@@ -54,7 +82,10 @@ func (f *ServiceListFilter) ValidateAndNormalize() error {
 	} else {
 		f.Order = order
 	}
+	return nil
+}
 
+func (f *ServiceListFilter) validateAndSetPage() error {
 	if f.Page < 0 {
 		return apperr.New(
 			apperr.ErrInvalidInput.StatusCode,
@@ -65,7 +96,10 @@ func (f *ServiceListFilter) ValidateAndNormalize() error {
 	if f.Page == 0 {
 		f.Page = 1
 	}
+	return nil
+}
 
+func (f *ServiceListFilter) validateAndSetLimit() error {
 	if f.Limit < 0 {
 		return apperr.New(
 			apperr.ErrInvalidInput.StatusCode,
